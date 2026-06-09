@@ -27,3 +27,12 @@ jobs:
 
       - name: Show WAR location
         run: ls target/*.war
+
+      - name: Stop and remove existing container
+        run: docker rm -f demo-app || true
+
+      - name: Build Docker image
+        run: docker build -t demo-app .
+
+      - name: Run Docker container
+        run: docker run -d --name demo-app -p 8080:8080 demo-app
