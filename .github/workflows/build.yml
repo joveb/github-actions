@@ -36,3 +36,10 @@ jobs:
 
       - name: Run Docker container
         run: docker run -d --name demo-app -p 8080:8080 demo-app
+
+      - name: Notify Google Chat
+        if: always()
+        run: |
+          $status = "${{ job.status }}"
+          $body = @{ text = "Build *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }}" } | ConvertTo-Json
+          Invoke-RestMethod -Uri "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" -Method Post -Body $body -ContentType "application/json"
