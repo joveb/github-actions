@@ -1,4 +1,4 @@
-name: Build WAR
+name: Build
 
 on:
   push:
@@ -9,7 +9,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build:
+  build-backend:
     runs-on: self-hosted
 
     steps:
@@ -23,21 +23,22 @@ jobs:
           distribution: 'temurin'
 
       - name: Build WAR with Maven
+        working-directory: backend
         run: mvn clean package -DskipTests
 
       - name: Extract version
         run: |
-          $version = ([xml](Get-Content pom.xml)).project.version
+          $version = ([xml](Get-Content backend/pom.xml)).project.version
           echo "APP_VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Show WAR location
-        run: ls target/*.war
+        run: ls backend/target/*.war
 
       - name: Stop and remove existing container
         run: docker rm -f demo-app; exit 0
 
       - name: Build Docker image
-        run: docker build -t demo-app .
+        run: docker build -t demo-app backend/
 
       - name: Run Docker container
         run: docker run -d --name demo-app -p 8080:8080 demo-app
@@ -46,5 +47,32 @@ jobs:
         if: always()
         run: |
           $status = "${{ job.status }}"
-          $body = @{ text = "Build *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }} | version: ${{ env.APP_VERSION }}" } | ConvertTo-Json
+          $body = @{ text = "Backend build *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }} | version: ${{ env.APP_VERSION }}" } | ConvertTo-Json
+          Invoke-RestMethod -Uri "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" -Method Post -Body $body -ContentType "application/json"
+
+  build-frontend:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build React app
+        working-directory: frontend
+        run: npm run build
+
+      - name: Notify Google Chat
+        if: always()
+        run: |
+          $status = "${{ job.status }}"
+          $body = @{ text = "Frontend build *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }}" } | ConvertTo-Json
           Invoke-RestMethod -Uri "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" -Method Post -Body $body -ContentType "application/json"
