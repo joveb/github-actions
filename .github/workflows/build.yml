@@ -31,12 +31,6 @@ jobs:
           $version = ([xml](Get-Content backend/pom.xml)).project.version
           echo "APP_VERSION=$version" >> $env:GITHUB_ENV
 
-      - name: Upload WAR artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: backend-war
-          path: backend/target/demo-0.0.1-SNAPSHOT.war
-
       - name: Notify Google Chat
         if: always()
         run: |
@@ -69,12 +63,6 @@ jobs:
           $version = (Get-Content frontend/package.json | ConvertFrom-Json).version
           echo "FRONTEND_VERSION=$version" >> $env:GITHUB_ENV
 
-      - name: Upload frontend artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: frontend-build
-          path: frontend/dist/
-
       - name: Notify Google Chat
         if: always()
         run: |
@@ -89,18 +77,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Download backend artifact
-        uses: actions/download-artifact@v8
         with:
-          name: backend-war
-          path: backend/target/
-
-      - name: Download frontend artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: frontend-build
-          path: frontend/dist/
+          clean: false
 
       - name: Extract versions
         run: |
@@ -138,6 +116,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          clean: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
