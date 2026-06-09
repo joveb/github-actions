@@ -130,3 +130,49 @@ jobs:
           $status = "${{ job.status }}"
           $body = @{ text = "Deploy *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }} | backend: ${{ env.APP_VERSION }} | frontend: ${{ env.FRONTEND_VERSION }}" } | ConvertTo-Json
           Invoke-RestMethod -Uri "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" -Method Post -Body $body -ContentType "application/json"
+
+  e2e-tests:
+    runs-on: self-hosted
+    needs: deploy
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e tests
+        id: e2e
+        working-directory: frontend
+        run: npx playwright test --config=playwright.config.js --reporter=json > playwright-report.json; exit 0
+
+      - name: Parse test results
+        id: results
+        run: |
+          $report = Get-Content frontend/playwright-report.json | ConvertFrom-Json
+          $passed = $report.stats.expected
+          $failed = $report.stats.unexpected
+          $total = $report.stats.total
+          $duration = [math]::Round($report.stats.duration / 1000, 1)
+          echo "PASSED=$passed" >> $env:GITHUB_ENV
+          echo "FAILED=$failed" >> $env:GITHUB_ENV
+          echo "TOTAL=$total" >> $env:GITHUB_ENV
+          echo "DURATION=$duration" >> $env:GITHUB_ENV
+
+      - name: Notify Google Chat
+        if: always()
+        run: |
+          $status = "${{ job.status }}"
+          $body = @{ text = "E2E Tests *$status*: ${{ github.repository }} @ ${{ github.ref_name }}`n✓ ${{ env.PASSED }} passed | ✗ ${{ env.FAILED }} failed | ${{ env.TOTAL }} total | ${{ env.DURATION }}s" } | ConvertTo-Json
+          Invoke-RestMethod -Uri "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" -Method Post -Body $body -ContentType "application/json"
