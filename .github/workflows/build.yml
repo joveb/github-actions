@@ -73,7 +73,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
-          path: frontend/build/
+          path: frontend/dist/
 
       - name: Notify Google Chat
         if: always()
@@ -100,7 +100,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-build
-          path: frontend/build/
+          path: frontend/dist/
 
       - name: Extract versions
         run: |
