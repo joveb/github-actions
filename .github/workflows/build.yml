@@ -70,9 +70,14 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Extract frontend version
+        run: |
+          $version = (Get-Content frontend/package.json | ConvertFrom-Json).version
+          echo "FRONTEND_VERSION=$version" >> $env:GITHUB_ENV
+
       - name: Notify Google Chat
         if: always()
         run: |
           $status = "${{ job.status }}"
-          $body = @{ text = "Frontend build *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }}" } | ConvertTo-Json
+          $body = @{ text = "Frontend build *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }} | version: ${{ env.FRONTEND_VERSION }}" } | ConvertTo-Json
           Invoke-RestMethod -Uri "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" -Method Post -Body $body -ContentType "application/json"
