@@ -25,6 +25,9 @@ jobs:
       - name: Build WAR with Maven
         run: mvn clean package -DskipTests
 
+      - name: Extract version
+        run: echo "APP_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $env:GITHUB_ENV
+
       - name: Show WAR location
         run: ls target/*.war
 
@@ -41,5 +44,5 @@ jobs:
         if: always()
         run: |
           $status = "${{ job.status }}"
-          $body = @{ text = "Build *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }}" } | ConvertTo-Json
+          $body = @{ text = "Build *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }} | version: ${{ env.APP_VERSION }}" } | ConvertTo-Json
           Invoke-RestMethod -Uri "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" -Method Post -Body $body -ContentType "application/json"
