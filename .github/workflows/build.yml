@@ -26,7 +26,9 @@ jobs:
         run: mvn clean package -DskipTests
 
       - name: Extract version
-        run: echo "APP_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $env:GITHUB_ENV
+        run: |
+          $version = ([xml](Get-Content pom.xml)).project.version
+          echo "APP_VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Show WAR location
         run: ls target/*.war
