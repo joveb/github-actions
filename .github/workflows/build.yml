@@ -1,0 +1,26 @@
+name: Build WAR
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Build WAR with Maven
+        run: mvn clean package -DskipTests
+
+      - name: Show WAR location
+        run: ls target/*.war
