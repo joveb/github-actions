@@ -1,4 +1,4 @@
-name: Build
+name: CI/CD Pipeline
 
 on:
   push:
@@ -26,22 +26,16 @@ jobs:
         working-directory: backend
         run: mvn clean package -DskipTests
 
-      - name: Extract version
+      - name: Extract backend version
         run: |
           $version = ([xml](Get-Content backend/pom.xml)).project.version
           echo "APP_VERSION=$version" >> $env:GITHUB_ENV
 
-      - name: Show WAR location
-        run: ls backend/target/*.war
-
-      - name: Stop and remove existing container
-        run: docker rm -f demo-app; exit 0
-
-      - name: Build Docker image
-        run: docker build -t demo-app backend/
-
-      - name: Run Docker container
-        run: docker run -d --name demo-app -p 8080:8080 demo-app
+      - name: Upload WAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-war
+          path: backend/target/demo-0.0.1-SNAPSHOT.war
 
       - name: Notify Google Chat
         if: always()
@@ -75,9 +69,64 @@ jobs:
           $version = (Get-Content frontend/package.json | ConvertFrom-Json).version
           echo "FRONTEND_VERSION=$version" >> $env:GITHUB_ENV
 
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build/
+
       - name: Notify Google Chat
         if: always()
         run: |
           $status = "${{ job.status }}"
           $body = @{ text = "Frontend build *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }} | version: ${{ env.FRONTEND_VERSION }}" } | ConvertTo-Json
+          Invoke-RestMethod -Uri "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" -Method Post -Body $body -ContentType "application/json"
+
+  deploy:
+    runs-on: self-hosted
+    needs: [build-backend, build-frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-war
+          path: backend/target/
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build/
+
+      - name: Extract versions
+        run: |
+          $backendVersion = ([xml](Get-Content backend/pom.xml)).project.version
+          $frontendVersion = (Get-Content frontend/package.json | ConvertFrom-Json).version
+          echo "APP_VERSION=$backendVersion" >> $env:GITHUB_ENV
+          echo "FRONTEND_VERSION=$frontendVersion" >> $env:GITHUB_ENV
+
+      - name: Stop and remove existing containers
+        run: docker rm -f demo-app demo-frontend; exit 0
+
+      - name: Build backend Docker image
+        run: docker build -t demo-app backend/
+
+      - name: Run backend Docker container
+        run: docker run -d --name demo-app -p 8080:8080 demo-app
+
+      - name: Build frontend Docker image
+        run: docker build -t demo-frontend frontend/
+
+      - name: Run frontend Docker container
+        run: docker run -d --name demo-frontend -p 3000:80 demo-frontend
+
+      - name: Notify Google Chat
+        if: always()
+        run: |
+          $status = "${{ job.status }}"
+          $body = @{ text = "Deploy *$status*: ${{ github.repository }} @ ${{ github.ref_name }} - ${{ github.sha }} | backend: ${{ env.APP_VERSION }} | frontend: ${{ env.FRONTEND_VERSION }}" } | ConvertTo-Json
           Invoke-RestMethod -Uri "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" -Method Post -Body $body -ContentType "application/json"
