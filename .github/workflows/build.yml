@@ -163,7 +163,7 @@ jobs:
           $report = Get-Content frontend/playwright-report.json | ConvertFrom-Json
           $passed = $report.stats.expected
           $failed = $report.stats.unexpected
-          $total = $report.stats.total
+          $total = $passed + $failed
           $duration = [math]::Round($report.stats.duration / 1000, 1)
           echo "PASSED=$passed" >> $env:GITHUB_ENV
           echo "FAILED=$failed" >> $env:GITHUB_ENV
@@ -174,5 +174,5 @@ jobs:
         if: always()
         run: |
           $status = "${{ job.status }}"
-          $body = @{ text = "E2E Tests *$status*: ${{ github.repository }} @ ${{ github.ref_name }}`n✓ ${{ env.PASSED }} passed | ✗ ${{ env.FAILED }} failed | ${{ env.TOTAL }} total | ${{ env.DURATION }}s" } | ConvertTo-Json
+          $body = @{ text = "E2E Tests *$status*: ${{ github.repository }} @ ${{ github.ref_name }} | passed: ${{ env.PASSED }} | failed: ${{ env.FAILED }} | total: ${{ env.TOTAL }} | duration: ${{ env.DURATION }}s" } | ConvertTo-Json
           Invoke-RestMethod -Uri "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" -Method Post -Body $body -ContentType "application/json"
